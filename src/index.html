@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- 
+    TODO:
+    Emotes raus blanken
+    Zeitlimit
+-->
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@700&display=swap" rel="stylesheet">
+    <title>Poll-o-tron</title>
+    <style>
+        @font-face {
+            font-family: 'Nunito';
+            src: url('fonts/Nunito-Regular.woff2') format('woff2'),
+                url('fonts/Nunito-Regular.woff') format('woff');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+
+
+        body,
+        html {
+            /* font-family: "Comic Sans MS"; */
+            font-family: 'Nunito', sans-serif;
+
+            font-size: 14px;
+            margin: 0px;
+            padding: 0px;
+            background: #222;
+            color: white;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            padding: 10px;
+        }
+
+        #poll {
+            width: calc(100% - 20px);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            flex-wrap: nowrap;
+            justify-content: space-evenly;
+            align-items: left;
+            align-content: center;
+
+        }
+
+        .voteBox {
+            background: #9246FF;
+            height: 5px;
+            transition: all ease-in-out 1s;
+
+
+        }
+
+        .voteLabel {
+            height: 100%;
+        }
+
+        .voteBar {}
+
+        .stats {
+            height: 120px;
+
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            justify-content: space-evenly;
+            align-items: center;
+            align-content: center;
+        }
+
+        .stat {
+            width: 100%;
+            margin: 0 10px;
+            max-height: 50px;
+            padding: 5px;
+            text-align: center;
+            border-bottom: 3px solid #555;
+
+            aspect-ratio: 1/1;
+            float: left;
+        }
+
+        .winning {
+            background: #ffd700;
+            /* background: linear-gradient(to right, #ef5350, #f48fb1, #7e57c2, #2196f3, #26c6da, #43a047, #eeff41, #f9a825, #ff5722); */
+            background-size: 200% 100%;
+
+            animation: Animation 5s linear infinite;
+        }
+
+        .peekmode.winning {
+            background: linear-gradient(to right, #ef5350, #f48fb1, #7e57c2, #2196f3, #26c6da, #43a047, #eeff41, #f9a825, #ff5722);
+        }
+
+        @keyframes Animation {
+            0% {
+                background-position: 0% 0%
+            }
+
+            100% {
+                background-position: 200% 0%
+            }
+        }
+    </style>
+</head>
+
+<body onload="window.scrollTo(0, 0);">
+    <div id="poll">
+
+    </div>
+
+    <script src="//unpkg.com/twitch-js@>2.0.0-beta.41"></script>
+
+    <script type="module">
+
+        const queryString = window.location.search;
+        const urlParams = new URLSearchParams(queryString);
+        const { Chat } = window.TwitchJs;
+        let token = undefined;
+        let username = undefined;
+        let channel = "jvpeek";
+        let admins = ["jvpeek", "souseiseki87"];
+        const pollTemplate = {
+            votes: [],
+            maxVotes: parseInt(urlParams.get("maxVotes"), 10) || 10,
+            minVotes: parseInt(urlParams.get("minVotes"), 10) || 0,
+            voteTime: 30000,
+            results: [],
+            average: 0,
+            maxVoted: 0
+        };
+        let jvpeekmode = 0;
+        let currentPoll;
+        const labels = [
+            "mies",
+            "kacke",
+            "schlimmer als Nyumis Mikro",
+            "gar nicht so geil",
+            "bodenlos",
+            "Katastrophe",
+            "Windows Vista",
+            "furchtbar",
+            "un-fucking-fassbar",
+            "Mayday",
+            "oma unterm Arm"
+        ]
+        startPoll();
+
+        const handleMessage = (msg) => {
+            let admin = false;
+            if (msg.event != "PRIVMSG") return;
+
+
+            if (msg.message.startsWith("!")) {
+                if (msg.tags.isModerator === true || msg.tags.badges.broadcaster === true || admins.includes(msg.username)) {
+                    admin = true;
+                    if (msg.message.startsWith("!peek")) {
+                        jvpeekmode = 1;
+                        updatePoll();
+                    }
+                    if (msg.message.startsWith("!poke")) {
+                        jvpeekmode = 0;
+                        updatePoll();
+                    }
+                    //mod commands go here
+                }
+
+                //other commands go here.
+            } else {
+                //chat parsing goes here
+                let matches = msg.message.match(/-?((\d+)([.,]\d+)?)/);
+
+                if (matches) {
+                    let firstMatch = parseFloat(matches[0].replace(",", "."), 10);
+                    if (firstMatch < currentPoll.minVotes || firstMatch > currentPoll.maxVotes) {
+                        return;
+                    }
+                    console.log(msg);
+                    currentPoll.votes[msg.username] = { value: parseFloat(firstMatch), color: msg.tags.color || '#FF00FF' };
+                    // document.getElementById('poll').innerHTML += firstMatch + "<br />";
+                    updatePoll();
+                }
+            }
+        };
+        function median(values) {
+            if (values.length === 0) {
+                return 0;
+
+            }
+
+            values.sort(function (a, b) {
+                return a - b;
+            });
+
+            var half = Math.floor(values.length / 2);
+
+            if (values.length % 2)
+                return values[half];
+
+            return (values[half - 1] + values[half]) / 2.0;
+        }
+        function updatePoll() {
+
+            // recalculate numbers
+            console.log("updating poll");
+            let average = 0;
+            let results = [];
+            for (let i = 0; i < currentPoll.maxVotes; i++) {
+                results[i] = 0;
+            }
+            let voteCount = 0;
+            let medianArray = [];
+            for (const key in currentPoll.votes) {
+                if (Object.hasOwnProperty.call(currentPoll.votes, key)) {
+                    const element = jvpeekmode == 0 ? currentPoll.votes[key].value : 10;
+
+                    average += element;
+                    medianArray.push(element);
+                    voteCount++;
+                    if (!results[Math.floor(element) - currentPoll.minVotes]) {
+                        results[Math.floor(element) - currentPoll.minVotes] = 0;
+                    }
+                    results[Math.floor(element) - currentPoll.minVotes]++;
+                }
+            }
+
+            currentPoll.median = median(medianArray);
+            if (voteCount > 0) {
+                currentPoll.average = average / voteCount;
+                currentPoll.maxVoted = 0;
+                for (let i = currentPoll.minVotes; i <= currentPoll.maxVotes; i++) {
+                    currentPoll.results[i] = results[i] / voteCount;
+                    if (currentPoll.maxVoted < currentPoll.results[i]) {
+                        currentPoll.maxVoted = currentPoll.results[i];
+                    }
+                }
+            }
+
+            console.log(currentPoll);
+            renderPoll();
+            // update visual elements
+        }
+
+
+        function createPollDOM() {
+            const pollbox = document.getElementById("poll");
+            if (currentPoll.average) {
+                //pollbox.innerHTML = currentPoll.average.toFixed(2);
+            }
+
+
+            for (let i = currentPoll.minVotes; i <= currentPoll.maxVotes; i++) {
+                // label anlegen
+                let thisVoteBar = document.createElement("div");
+                thisVoteBar.classList.add("voteBar");
+                let thisVoteLabel = document.createElement("div");
+                thisVoteLabel.classList.add("voteLabel", "label" + i);
+                thisVoteLabel.innerText = i + " - " + labels[i];
+                thisVoteBar.appendChild(thisVoteLabel);
+                // balken anlegen
+                let thisVoteBox = document.createElement("div");
+                thisVoteBox.classList.add("voteBox", "box" + i);
+
+                thisVoteBar.appendChild(thisVoteBox);
+                pollbox.appendChild(thisVoteBar);
+            }
+            let thisStatsBox = document.createElement("div");
+            thisStatsBox.classList.add("stats");
+            thisStatsBox.id = "statsBox";
+
+            let thisStatsTime = document.createElement("div");
+            thisStatsTime.classList.add("stat", "time");
+            thisStatsTime.id = "statsTime";
+            thisStatsBox.appendChild(thisStatsTime);
+
+            let thisStatsVotes = document.createElement("div");
+            thisStatsVotes.classList.add("stat", "votes");
+            thisStatsVotes.id = "statsVotes";
+            thisStatsBox.appendChild(thisStatsVotes);
+
+            let thisStatsAVG = document.createElement("div");
+            thisStatsAVG.classList.add("stat", "avg");
+            thisStatsAVG.id = "statsAVG";
+            thisStatsBox.appendChild(thisStatsAVG);
+
+
+            pollbox.appendChild(thisStatsBox);
+
+        }
+        function renderPoll() {
+            console.log("rendering poll");
+            for (let i = currentPoll.minVotes; i <= currentPoll.maxVotes; i++) {
+                let thisVoteBox = document.querySelector(".box" + i);
+                let width = (currentPoll.results[i] * 100 / currentPoll.maxVoted) || 0;
+                if (jvpeekmode == 1) {
+                    thisVoteBox.classList.add("peekmode");
+                } else {
+                    thisVoteBox.classList.remove("peekmode");
+                }
+                if (width >= 99.9) {
+                    thisVoteBox.classList.add("winning");
+                } else {
+                    thisVoteBox.classList.remove("winning");
+                }
+                console.log(width);
+                thisVoteBox.style.width = width + "%";
+            }
+            document.getElementById("statsVotes").innerText = "Votes: " + Object.keys(currentPoll.votes).length;
+            
+            document.getElementById("statsAVG").innerHTML = "Average: " + currentPoll.average.toFixed(2) + "<br />";
+            document.getElementById("statsAVG").innerHTML += "Median: " + currentPoll.median.toFixed(2);
+            if (jvpeekmode == 1) {
+                document.getElementById("statsAVG").innerHTML = "JvPeek always wins";
+            }
+        }
+        function startPoll() {
+            currentPoll = JSON.parse(JSON.stringify(pollTemplate));
+            createPollDOM();
+            updatePoll();
+            renderPoll();
+
+        }
+        function chatsay(channel, text) {
+            if (token != undefined) {
+                chatobj.say(channel, text);
+            } else {
+                console.log("[ChatSay]", text, "is what i would say if I HAD A TOKEN!!11!"); //Fixed that for you
+            }
+        }
+
+        const run = async () => {
+            // Parse channel parameter
+            if (urlParams.has("channel")) {
+                channel = urlParams.get("channel");
+            }
+            if (urlParams.has("username") && urlParams.has("token")) {
+                username = urlParams.get("username");
+                token = urlParams.get("token");
+            }
+
+            const chat = new Chat({
+                token,
+                username,
+                log: { level: "warn" }
+            });
+
+            chat.on("*", (message) => {
+                handleMessage(message);
+            });
+
+            await chat.connect();
+            await chat.join(channel);
+            return chat;
+        };
+
+        const chatobj = run();
+    </script>
+</body>
+
+</html>

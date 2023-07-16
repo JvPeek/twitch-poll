@@ -142,7 +142,7 @@
         };
         let jvpeekmode = 0;
         let currentPoll;
-        const labels = urlParams.get("labels").split("|") || [
+        const labels = urlParams.get("labels")?.split("|") || [
             "mies",
             "kacke",
             "schlimmer als Nyumis Mikro",
@@ -155,6 +155,7 @@
             "Mayday",
             "oma unterm Arm"
         ]
+        let startTime;
         startPoll();
 
         const handleMessage = (msg) => {
@@ -199,7 +200,6 @@
                 }
             }
         };
-        let startTime;
         function startTimer() {
             startTime = Date.now();
         }
@@ -239,15 +239,16 @@
             let medianArray = [];
             for (const key in currentPoll.votes) {
                 if (Object.hasOwnProperty.call(currentPoll.votes, key)) {
-                    const element = jvpeekmode == 0 ? currentPoll.votes[key].value : 10;
+                    const element = jvpeekmode == 0 ? currentPoll.votes[key].value : currentPoll.maxVotes;
 
                     average += element;
                     medianArray.push(element);
                     voteCount++;
-                    if (!results[Math.floor(element) - currentPoll.minVotes]) {
-                        results[Math.floor(element) - currentPoll.minVotes] = 0;
+                    let voteKey = Math.floor(element);
+                    if (!results[voteKey]) {
+                        results[voteKey] = 0;
                     }
-                    results[Math.floor(element) - currentPoll.minVotes]++;
+                    results[voteKey]++;
                 }
             }
 
@@ -281,7 +282,7 @@
                 thisVoteBar.classList.add("voteBar");
                 let thisVoteLabel = document.createElement("div");
                 thisVoteLabel.classList.add("voteLabel", "label" + i);
-                thisVoteLabel.innerText = i + " - " + labels[i];
+                thisVoteLabel.innerText = i + " - " + labels[i - currentPoll.minVotes];
                 thisVoteBar.appendChild(thisVoteLabel);
                 // balken anlegen
                 let thisVoteBox = document.createElement("div");

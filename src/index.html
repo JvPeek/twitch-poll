@@ -135,6 +135,7 @@
             votes: [],
             maxVotes: parseInt(urlParams.get("maxVotes"), 10) || 10,
             minVotes: parseInt(urlParams.get("minVotes"), 10) || 0,
+            stepSize: parseFloat(urlParams.get("stepSize")) || 1,
             voteTime: 30000,
             results: [],
             average: 0,
@@ -142,7 +143,7 @@
         };
         let jvpeekmode = 0;
         let currentPoll;
-        const labels = urlParams.get("labels").split("|") || [
+        const labels = urlParams.get("labels")?.split("|") || [
             "mies",
             "kacke",
             "schlimmer als Nyumis Mikro",
@@ -155,6 +156,7 @@
             "Mayday",
             "oma unterm Arm"
         ]
+        let startTime;
         startPoll();
 
         const handleMessage = (msg) => {
@@ -185,6 +187,7 @@
                 });
 
 
+                //let matches = msg.message.match(/^\s*-?((\d+)([.,]\d+)?)/);
                 let matches = msg.message.match(/-?((\d+)([.,]\d+)?)/);
 
 
@@ -199,7 +202,6 @@
                 }
             }
         };
-        let startTime;
         function startTimer() {
             startTime = Date.now();
         }
@@ -208,6 +210,15 @@
         }
         function endTimer() {
             startTime = 0;
+        }
+
+
+        function findClosest(value) {
+            let temp = value - currentPoll.minVotes;
+            temp /= currentPoll.stepSize
+            temp = Math.floor(temp)
+            temp = currentPoll.minVotes + (temp * currentPoll.stepSize)
+            return temp
         }
 
         function median(values) {
@@ -232,22 +243,26 @@
             console.log("updating poll");
             let average = 0;
             let results = [];
-            for (let i = 0; i < currentPoll.maxVotes; i++) {
+            for (let i = 0; i < currentPoll.maxVotes; i += currentPoll.stepSize) {
                 results[i] = 0;
             }
             let voteCount = 0;
             let medianArray = [];
             for (const key in currentPoll.votes) {
                 if (Object.hasOwnProperty.call(currentPoll.votes, key)) {
-                    const element = jvpeekmode == 0 ? currentPoll.votes[key].value : 10;
+                    const element = jvpeekmode == 0 ? currentPoll.votes[key].value : currentPoll.maxVotes;
 
                     average += element;
                     medianArray.push(element);
                     voteCount++;
-                    if (!results[Math.floor(element) - currentPoll.minVotes]) {
-                        results[Math.floor(element) - currentPoll.minVotes] = 0;
+                    //let voteKey = Math.floor(element);
+                    //let closest = findClosest(element)
+                    //console.log(element, ":", voteKey, "vs", closest)
+                    let voteKey = findClosest(element)
+                    if (!results[voteKey]) {
+                        results[voteKey] = 0;
                     }
-                    results[Math.floor(element) - currentPoll.minVotes]++;
+                    results[voteKey]++;
                 }
             }
 
@@ -255,7 +270,7 @@
             if (voteCount > 0) {
                 currentPoll.average = average / voteCount;
                 currentPoll.maxVoted = 0;
-                for (let i = currentPoll.minVotes; i <= currentPoll.maxVotes; i++) {
+                for (let i = currentPoll.minVotes; i <= currentPoll.maxVotes; i += currentPoll.stepSize) {
                     currentPoll.results[i] = results[i] / voteCount;
                     if (currentPoll.maxVoted < currentPoll.results[i]) {
                         currentPoll.maxVoted = currentPoll.results[i];
@@ -274,18 +289,19 @@
                 //pollbox.innerHTML = currentPoll.average.toFixed(2);
             }
 
-
-            for (let i = currentPoll.minVotes; i <= currentPoll.maxVotes; i++) {
+            let labelCount = 0;
+            for (let i = currentPoll.minVotes; i <= currentPoll.maxVotes; i += currentPoll.stepSize) {
+                let iStr = String(i).replace(".", "_")
                 // label anlegen
                 let thisVoteBar = document.createElement("div");
                 thisVoteBar.classList.add("voteBar");
                 let thisVoteLabel = document.createElement("div");
-                thisVoteLabel.classList.add("voteLabel", "label" + i);
-                thisVoteLabel.innerText = i + " - " + labels[i];
+                thisVoteLabel.classList.add("voteLabel", "label" + iStr);
+                thisVoteLabel.innerText = i + " - " + labels[labelCount++];
                 thisVoteBar.appendChild(thisVoteLabel);
                 // balken anlegen
                 let thisVoteBox = document.createElement("div");
-                thisVoteBox.classList.add("voteBox", "box" + i);
+                thisVoteBox.classList.add("voteBox", "box" + iStr);
 
                 thisVoteBar.appendChild(thisVoteBox);
                 pollbox.appendChild(thisVoteBar);
@@ -316,8 +332,9 @@
         function renderPoll() {
             
             console.log("rendering poll");
-            for (let i = currentPoll.minVotes; i <= currentPoll.maxVotes; i++) {
-                let thisVoteBox = document.querySelector(".box" + i);
+            for (let i = currentPoll.minVotes; i <= currentPoll.maxVotes; i += currentPoll.stepSize) {
+                let iStr = String(i).replace(".", "_")
+                let thisVoteBox = document.querySelector(".box" + iStr);
                 let width = (currentPoll.results[i] * 100 / currentPoll.maxVoted) || 0;
                 if (jvpeekmode == 1) {
                     thisVoteBox.classList.add("peekmode");

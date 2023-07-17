@@ -30,69 +30,133 @@
         html {
             /* font-family: "Comic Sans MS"; */
             font-family: 'Nunito', sans-serif;
-
+            -webkit-font-smoothing: antialiased;
             font-size: 14px;
             margin: 0px;
             padding: 0px;
-            background: #222;
             color: white;
             width: 100%;
             height: 100%;
             overflow: hidden;
         }
 
-        body {
-            padding: 10px;
-        }
-
         #poll {
-            width: calc(100% - 20px);
-            height: 100%;
+            padding: 10px;
+            padding-right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 5px;
+            width: calc(100% - 30px);
+            height: calc(100% - 20px);
             display: flex;
             flex-direction: column;
-            flex-wrap: nowrap;
-            justify-content: space-evenly;
-            align-items: left;
-            align-content: center;
-
-        }
-
-        .voteBox {
-            background: #9246FF;
-            height: 5px;
-            transition: all ease-in-out 1s;
-
-
-        }
-
-        .voteLabel {
-            height: 100%;
-        }
-
-        .stats {
-            height: 120px;
-
-            display: flex;
-            flex-direction: row;
             flex-wrap: nowrap;
             justify-content: space-evenly;
             align-items: center;
             align-content: center;
         }
 
-        .stat {
+        .headerText {
+            color: greenyellow;
+        }
+        .voteBar {
+            flex-grow: 1;
+            position: relative;
             width: 100%;
-            margin: 0 10px;
-            max-height: 50px;
-            padding: 5px;
-            text-align: center;
-            border-bottom: 3px solid #555;
-            aspect-ratio: 1/1;
-            float: left;
+            margin: 1px 0;
+
+        }
+        .ended .voteBar {
+            opacity: 0.5;
+        }
+        .voteNumber {
+            height: 100%;
+            position: absolute;
+            left: 0px;
+            padding-left: 10px;
+            display: flex;
+            align-content: center;
+            flex-wrap: wrap;
+            font-weight: bold;
         }
 
+        .voteBox {
+            display: flex;
+            align-content: center;
+            flex-wrap: wrap;
+            background-image: linear-gradient(90deg, rgba(146, 70, 255, 1) 0%, rgba(146, 70, 255, 1) 50%, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0) 100%);
+            background-size: 200% 100%;
+            height: 100%;
+            padding-left: 15px;
+            padding-right: 65px;
+            transition: background-position ease-in-out 1s, color ease-out 1s;
+            width: calc(100% - 130px);
+            position: absolute;
+            right: 0px;
+            font-size: clamp(12px, 4vw, 16px);
+
+        }
+
+        .voteBox span {
+            position: absolute;
+            right: 0px;
+            height: 100%;
+            display: flex;
+            align-content: center;
+            flex-wrap: wrap;
+            padding-right: 20px;
+        }
+        .stats {
+            height: 80px;
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            justify-content: space-evenly;
+            align-items: center;
+            border-top: 3px solid #555;
+            padding-bottom: 20px;
+            margin-left: 10px;
+            margin-top: 7px;
+        }
+
+        .stat {
+            display: flex;
+            align-content: center;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            float: left;
+            position: relative;
+        }
+
+        .stat .value {
+            position: relative;
+            top: 30%;
+            font-size: 1.4em;
+            color: rgba(255,255,255,0.7);
+
+        }
+
+        .stat .label {
+            color: rgba(255,255,255,0.7);
+            position: absolute;
+            display: block;
+            bottom: 0px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .ended .stat .value,
+        .ended .stat .label {
+            color: white;
+        }
         .winning {
-            background: #ffd700;
+            background-image: linear-gradient(90deg, #ffd700 0%, #ffd700 50%, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0) 100%);
+            background-size: 200% 100%;
+            color: black;
+            font-size: clamp(12px, 4vw, 16px);
+            font-weight: bold;
         }
 
         .peekmode.winning {
@@ -133,14 +197,16 @@
         let admins = ["jvpeek", "souseiseki87"];
         const pollTemplate = {
             votes: [],
-            maxVotes: parseInt(urlParams.get("maxVotes"), 10) || 10,
-            minVotes: parseInt(urlParams.get("minVotes"), 10) || 0,
+            maxVotes: parseFloat(urlParams.get("maxVotes")) || 10,
+            minVotes: parseFloat(urlParams.get("minVotes")) || 0,
             stepSize: parseFloat(urlParams.get("stepSize")) || 1,
             voteTime: 30000,
             results: [],
             average: 0,
-            maxVoted: 0
+            maxVoted: 0,
+            headerText: urlParams.get("headerText")
         };
+        let votePosition = urlParams.get("votePosition") || "any";
         let jvpeekmode = 0;
         let currentPoll;
         const labels = urlParams.get("labels")?.split("|") || [
@@ -187,8 +253,22 @@
                 });
 
 
-                //let matches = msg.message.match(/^\s*-?((\d+)([.,]\d+)?)/);
-                let matches = msg.message.match(/-?((\d+)([.,]\d+)?)/);
+                let matches;
+                switch (votePosition) {
+                    case "begin":
+                        matches = msg.message.match(/^\s*-?((\d+)([.,]\d+)?)/);
+                        break;
+                    case "end":
+                        matches = msg.message.match(/-?((\d+)([.,]\d+)?)\s*$/);
+                        break;
+                    case "single":
+                        matches = msg.message.match(/^\s*-?((\d+)([.,]\d+)?)\s*$/);
+                        break;
+
+                    default:
+                        matches = msg.message.match(/-?((\d+)([.,]\d+)?)/);
+                        break;
+                }
 
 
                 if (matches) {
@@ -285,35 +365,49 @@
 
         function createPollDOM() {
             const pollbox = document.getElementById("poll");
-            if (currentPoll.average) {
-                //pollbox.innerHTML = currentPoll.average.toFixed(2);
-            }
+            
 
+            if (currentPoll.headerText) {
+                let thisHeader = document.createElement("div");
+                thisHeader.innerHTML = currentPoll.headerText;
+                pollbox.appendChild(thisHeader);
+            }
             let labelCount = 0;
             for (let i = currentPoll.minVotes; i <= currentPoll.maxVotes; i += currentPoll.stepSize) {
+                // Nummer für ClassList formatieren
                 let iStr = String(i).replace(".", "_")
-                // label anlegen
+
+                // Leiste anlegen
                 let thisVoteBar = document.createElement("div");
                 thisVoteBar.classList.add("voteBar");
-                let thisVoteLabel = document.createElement("div");
-                thisVoteLabel.classList.add("voteLabel", "label" + iStr);
-                thisVoteLabel.innerText = i + " - " + labels[labelCount++];
-                thisVoteBar.appendChild(thisVoteLabel);
-                // balken anlegen
+
+                // Zahlenfeld anlegen
+                let thisVoteNumber = document.createElement("div");
+                thisVoteNumber.classList.add("voteNumber", "number" + iStr);
+                if (currentPoll.stepSize % 1 != 0) {
+                    thisVoteNumber.innerText = i.toFixed(1);
+                } else {
+                    thisVoteNumber.innerText = i;
+                }
+
+                // Balken anlegen
                 let thisVoteBox = document.createElement("div");
                 thisVoteBox.classList.add("voteBox", "box" + iStr);
+                thisVoteBox.innerText = labels[labelCount++];
+                thisVoteBox.appendChild(document.createElement("span"));
 
+
+                // alles in die Leiste stopfen
+                thisVoteBar.appendChild(thisVoteNumber);
                 thisVoteBar.appendChild(thisVoteBox);
+
+                // Leiste in die Liste
                 pollbox.appendChild(thisVoteBar);
             }
             let thisStatsBox = document.createElement("div");
             thisStatsBox.classList.add("stats");
             thisStatsBox.id = "statsBox";
 
-            let thisStatsTime = document.createElement("div");
-            thisStatsTime.classList.add("stat", "time");
-            thisStatsTime.id = "statsTime";
-            thisStatsBox.appendChild(thisStatsTime);
 
             let thisStatsVotes = document.createElement("div");
             thisStatsVotes.classList.add("stat", "votes");
@@ -326,11 +420,16 @@
             thisStatsBox.appendChild(thisStatsAVG);
 
 
+            let thisStatsMedian = document.createElement("div");
+            thisStatsMedian.classList.add("stat", "median");
+            thisStatsMedian.id = "statsMedian";
+            thisStatsBox.appendChild(thisStatsMedian);
+
             pollbox.appendChild(thisStatsBox);
 
         }
         function renderPoll() {
-            
+
             console.log("rendering poll");
             for (let i = currentPoll.minVotes; i <= currentPoll.maxVotes; i += currentPoll.stepSize) {
                 let iStr = String(i).replace(".", "_")
@@ -346,12 +445,15 @@
                 } else {
                     thisVoteBox.classList.remove("winning");
                 }
-                thisVoteBox.style.width = width + "%";
-            }
-            document.getElementById("statsVotes").innerText = "Votes: " + Object.keys(currentPoll.votes).length;
+                thisVoteBox.style.backgroundPosition = 100 - width + "% 0";
+                console.dir(thisVoteBox.lastChild);
+                thisVoteBox.lastChild.innerText = ((currentPoll.results[i] || 0) * 100).toFixed(0) + "%";
 
-            document.getElementById("statsAVG").innerHTML = "Average: " + currentPoll.average.toFixed(2) + "<br />";
-            document.getElementById("statsAVG").innerHTML += "Median: " + currentPoll.median.toFixed(2);
+            }
+            document.getElementById("statsVotes").innerHTML = "<span class=\"value\">" + Object.keys(currentPoll.votes).length + "</span><span class=\"label\">Votes</span>";
+
+            document.getElementById("statsAVG").innerHTML = "<span class=\"value\">" + currentPoll.average.toFixed(2) + "</span><span class=\"label\">Average</span>";
+            document.getElementById("statsMedian").innerHTML = "<span class=\"value\">" + currentPoll.median.toFixed(2) + "</span><span class=\"label\">Median</span>";
             if (jvpeekmode == 1) {
                 document.getElementById("statsAVG").innerHTML = "JvPeek always wins";
             }

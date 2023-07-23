@@ -438,7 +438,7 @@
                 // Balken anlegen
                 let thisVoteBox = document.createElement("div");
                 thisVoteBox.classList.add("voteBox", "box" + iStr);
-                thisVoteBox.innerText = labels[labelCount++];
+                thisVoteBox.innerText = labels[labelCount++] || "";
                 thisVoteBox.appendChild(document.createElement("span"));
 
 
